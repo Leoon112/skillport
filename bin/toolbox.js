@@ -6,13 +6,14 @@ const { loadTools } = require('../lib/load');
 const { validateTool } = require('../lib/validate');
 const { checkTool } = require('../lib/check');
 const { ID_RE } = require('../lib/schema');
+const { getAdapter, listAdapters } = require('../lib/adapters');
 
 // 关键：从任意 cwd 运行都能定位到项目根，从而找到 tools/
 const ROOT = path.resolve(__dirname, '..');
 const TOOLS_DIR = path.join(ROOT, 'tools');
 
 function main() {
-  const [cmd, arg] = process.argv.slice(2);
+  const [cmd, arg, arg2] = process.argv.slice(2);
   switch (cmd) {
     case 'validate': return cmdValidate();
     case 'check': return cmdCheck();
@@ -21,6 +22,7 @@ function main() {
     case 'show': return cmdShow(arg);
     case 'add': return cmdAdd(arg);
     case 'index': return cmdIndex();
+    case 'export': return cmdExport(arg, arg2);
     default:
       return usage();
   }
@@ -37,6 +39,7 @@ function usage() {
     '  node bin/toolbox.js show <id>    查看工具详情',
     '  node bin/toolbox.js add <id>     新建工具骨架',
     '  node bin/toolbox.js index        生成派生索引缓存',
+    '  node bin/toolbox.js export [目标] 导出为目标 agent 格式',
   ].join('\n'));
 }
 
@@ -218,6 +221,37 @@ function cmdIndex() {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify(index, null, 2), 'utf8');
   console.log(`[ok] 已生成 .toolbox/index.json（${tools.length} 个工具）`);
+}
+
+function cmdExport(agent, id) {
+  const tools = requireTools();
+  if (!agent) {
+    console.log('可用目标格式：');
+    for (const a of listAdapters()) console.log(`  ${a.name}\t${a.description}`);
+    return;
+  }
+  const adapter = getAdapter(agent);
+  if (!adapter) {
+    console.error(`未知目标 "${agent}"（可用：${listAdapters().map(a => a.name).join(', ')}）`);
+    process.exit(1);
+  }
+  const targets = id ? tools.filter(t => t.data.id === id) : tools;
+  if (id && targets.length === 0) {
+    console.error(`未找到工具 "${id}"`);
+    process.exit(1);
+  }
+  const distRoot = path.join(ROOT, 'dist', agent);
+  let n = 0;
+  for (const t of targets) {
+    const { files } = adapter.convert(t);
+    for (const f of files) {
+      const outPath = path.join(distRoot, f.path);
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, f.content, 'utf8');
+      n++;
+    }
+  }
+  console.log(`[ok] 已导出 ${targets.length} 个工具 → ${path.relative(ROOT, distRoot)}（${n} 个文件）`);
 }
 
 main();
