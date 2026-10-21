@@ -1,4 +1,4 @@
-# 数据规范（SCHEMA v1）
+# 数据规范（SCHEMA v2）
 
 一个工具 = 一个 Markdown 文件，位于 `tools/`。文件开头是 YAML frontmatter，之后是正文（用法说明、示例）。
 
@@ -31,14 +31,38 @@
 | `deps` | string[] | `[]` | 依赖声明，如 `["node>=18", "playwright"]` |
 | `trust` | enum | `declared` | 见下方 trust 分级 |
 
-### 第二阶段（可移植层字段，本阶段只定义、不实现转换）
+### 可移植层字段（第二阶段，AI 调用工具所需，已实现）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `command` | string | 如何调用工具 |
-| `args` | string[] | 调用参数模板 |
-| `inputs` | object | 输入参数 schema（供 AI 调用） |
-| `permissions` | string[] | 需要的权限（供 AI 调用前做权限检查） |
+| `command` | string | 调用入口，如 `node tools/scripts/x.js` 或 `npx playwright` |
+| `args` | string[] | 默认参数，如 `["--format", "json"]` |
+| `inputs` | object[] | 输入参数 schema（见下方子字段） |
+| `permissions` | string[] | 权限声明，枚举：`network` / `file-read` / `file-write` / `exec` |
+
+`inputs` 每项子字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 参数名 |
+| `type` | string | 否 | 枚举：`string` / `number` / `boolean` |
+| `description` | string | 否 | 参数说明 |
+| `required` | boolean | 否 | 是否必填，默认 false |
+
+示例：
+
+```yaml
+command: node tools/scripts/website-audit.js
+args: [--format, json]
+inputs:
+  - name: url
+    type: string
+    description: 要审计的网址
+    required: true
+permissions: [network, file-read]
+```
+
+AI 层调用约定：`command` + 按 `inputs` 填充的参数 + `args` 默认参数，组成最终执行命令；调用前先检查 `permissions` 是否被授权。
 
 ## 类型与枚举规范
 

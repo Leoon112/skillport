@@ -10,6 +10,17 @@ installed: true
 path: tools/scripts/website-audit.js
 deps: [node>=18]
 trust: declared
+command: node tools/scripts/website-audit.js
+args: [--format, json]
+inputs:
+  - name: url
+    type: string
+    description: 要审计的网址
+    required: true
+  - name: depth
+    type: number
+    description: 爬取深度
+permissions: [network, file-read]
 ---
 
 # Website Audit
@@ -18,7 +29,7 @@ trust: declared
 
 ## 用法
 
-（第二阶段补充 command / args / inputs 字段后，AI 层可据此自动调用。）
+AI 层可依据 frontmatter 的 `command` / `inputs` / `permissions` 字段自动调用本工具（当前为占位脚本，真实逻辑待实现）。
 
 ## 权限
 
